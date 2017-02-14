@@ -64,16 +64,18 @@
 const int STEPPER_STEPS_PER_REV = 1600;
 const int STEPPER_NORMAL_SPEED = 37;
 
-const int STEPPER_PHASE1_PIN = 22;
-const int STEPPER_PHASE2_PIN = 24;
+const int STEPPER_PHASE1_PIN = 34;
+const int STEPPER_PHASE2_PIN = 36;
 
-const int PHOTO_GATE_PIN = 32;
-const int PHOTO_VCC_PIN = 30;
+const int DETECTOR_GATE_PIN = 32;
+const int DETECTOR_VCC_PIN = 30;
 
 const int RFID_RESET_PIN = 48;
 const int RFID_TIR_PIN = 50;
 const int RFID_RX_PIN = 52;
 const int RFID_TX_PIN = 53;
+
+const int LED_PIN = 46;
 
 #define CW(steps) (steps)				// clock-wise direction
 #define CCW(steps) (-(steps))			// counter-clock-wise direction
@@ -139,11 +141,11 @@ void sendPacketToHost(String payload) {
 //  - maxSteps:  max number of steps to move in each direction
 //  - stepsPerMove: how much to move each time
 //
-bool lookForSlit(int maxSteps = STEPPER_STEPS_PER_REV / 2, int stepsPerMove = 1) {
+bool lookForSlit(int maxSteps = (STEPPER_STEPS_PER_REV / 2) + 20, int stepsPerMove = 1) {
 	int count, slitWidth;
 	bool found = false;
 
-	photoLED(ON);
+	detectorLED(ON);
 	if (slitDetected()) {
 		found = true;
 		goto out;
@@ -176,19 +178,19 @@ bool lookForSlit(int maxSteps = STEPPER_STEPS_PER_REV / 2, int stepsPerMove = 1)
 	}
 
 out:
-	photoLED(OFF);
+	detectorLED(OFF);
 	return found;
 }
 
-void blink() {
-	digitalWrite(LED_BUILTIN, HIGH);
-	delay(blink_led_on);
-	digitalWrite(LED_BUILTIN, LOW);
-	delay(blink_led_off);
+void blink(int onMillis = blink_led_on, int offMillis = blink_led_off) {
+	digitalWrite(LED_PIN, HIGH);
+	delay(onMillis);
+	digitalWrite(LED_PIN, LOW);
+	delay(offMillis);
 }
 
 void setup() {
-	pinMode(LED_BUILTIN, OUTPUT);
+	pinMode(LED_PIN, OUTPUT);
 	lookAlive();
 
 	Serial.begin(57600);	// opens serial port, sets data rate to 9600 bps
@@ -199,10 +201,10 @@ void setup() {
 	stepper.setSpeed(STEPPER_NORMAL_SPEED);//define  the stepper speed
 
 	// optical-gate pins
-	pinMode(PHOTO_VCC_PIN, OUTPUT);         // LED power
-	digitalWrite(PHOTO_VCC_PIN, HIGH);      // turn LED on
+	pinMode(DETECTOR_VCC_PIN, OUTPUT);         // LED power
+	detectorLED(OFF);
 
-	pinMode(PHOTO_GATE_PIN, INPUT_PULLUP);  // HIGH: no slit, LOW: slit
+	pinMode(DETECTOR_GATE_PIN, INPUT_PULLUP);  // HIGH: no slit, LOW: slit
 
 	debugln("filter wheel ready ...");
 
@@ -217,18 +219,18 @@ void setup() {
 //  the slit.
 //
 bool slitDetected() {
-	bool detected = digitalRead(PHOTO_GATE_PIN) == LOW;
+	bool detected = digitalRead(DETECTOR_GATE_PIN) == LOW;
 
 	debug(detected ? 'X' : 'x');
 	return detected;
 }
 
-void photoLED(bool onOff) {
-	digitalWrite(PHOTO_VCC_PIN, onOff ? HIGH : LOW);
+void detectorLED(bool onOff) {
+	digitalWrite(DETECTOR_VCC_PIN, onOff ? HIGH : LOW);
 	if (onOff == true)
 		delay(10);
 }
-
+ 
 //
 // Tries to read the slot tag.
 // 1. Searches for the optical slit
@@ -237,8 +239,8 @@ void photoLED(bool onOff) {
 String doGetTag() {
 	String tag;
 
-	if (!lookForSlit())
-		return String("error:Cannot find slit");
+	//if (!lookForSlit())
+	//	return String("error:Cannot find slit");
 
 	tag = tagReader.read();
 	if (tag.startsWith("error:"))
@@ -311,7 +313,7 @@ void loop() {
 			int nSteps = command.substring(strlen("search:")).toInt();
 			lookForSlit(nSteps);
 		}
-		else if (command.startsWith("help", 0)) {
+		else if (command.startsWith("help", 0) || command.startsWith("?", 0)) {
 			reply = String("commands:\n") +
 				String("  get-tag    - reads the RFID tag\n") +
 				String("  move-cw:N  - moves N slots clock-wise\n") +

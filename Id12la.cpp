@@ -26,9 +26,11 @@
 
 const int TagPayloadBytes = 10;
 const int TagTransmissionBytes = TagPayloadBytes + 6; // [STX][Payload(10)][CHK(2)][CR][NL][ETX]
+extern void blink(int, int);
 
 Ascii ascii;
 byte buf[TagTransmissionBytes];
+const int io_blink_on = 20, io_blink_off = 20;
 
 #ifdef USE_SOFTWARE_SERIAL
 
@@ -115,7 +117,7 @@ String dataArrivedSafely(int nbytes) {
 		return String("error:Too short");
 
 	// check we received the special bytes
-	if (buf[0] != ascii.STX || buf[13] != ascii.CR || buf[14] != ascii.NL || buf[15] != ascii.ETX)		
+	if (buf[0] != ascii.STX || buf[13] != ascii.CR || buf[14] != ascii.NL || buf[15] != ascii.ETX)
 		return String("error:Bad special characters");
 
 	// compute CRC
@@ -142,20 +144,22 @@ String Id12la::read() {
 	clearBufs();                            // clear read buffer and tag areas
 	reset();                                // force reader to take a reading
 	timeLimit = micros() + 1000;
- 
+
 	while (availableBytes() < TagTransmissionBytes + 1)
 		if ((long)(micros() - timeLimit) >= 0)
 			return String("error:Timeout");
 
 	while ((*p = readByte()) != Ascii::STX) // skip noise up to Ascii::STX
-		;
+		blink(io_blink_on, io_blink_off);
 	p++;
 	while ((*p++ = readByte()) != Ascii::ETX)
-		;
+		blink(io_blink_on, io_blink_off);
 	*p = 0;									// NULL terminate the buffer
 
-	for (int i = availableBytes(); i; i--)	// flush incoming data
+	for (int i = availableBytes(); i; i--) {// flush incoming data
 		readByte();
+		blink(io_blink_on, io_blink_off);
+	}
 
 	status = dataArrivedSafely(p - buf);
 	if (status.startsWith("error:"))
