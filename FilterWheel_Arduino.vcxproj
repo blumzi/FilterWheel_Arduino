@@ -89,6 +89,9 @@
     <ClCompile Include="Ascii.cpp" />
     <ClCompile Include="Id12la.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="FW-JunctionBox-Wiring.txt" />
+  </ItemGroup>
   <PropertyGroup>
     <DebuggerFlavor>VisualMicroDebugger</DebuggerFlavor>
   </PropertyGroup>

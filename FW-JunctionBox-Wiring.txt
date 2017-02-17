@@ -1,0 +1,130 @@
+
+
+
+  Modules
+  -------
+  
+   Ardu: The Arduino module.
+   JBox: The junction-box.
+   RFID: The RFID reader module.
+   Step: The stepper motor controller module.
+   Det:  The slit detector module.
+  
+  
+  
+  Connections diagram
+  -------------------
+  
+                                  +------------------------+
+                                  |                        |  Cable-2  +----------+
+                                  |  Junction        DB9-2 +  -------  + Detector |
+                                  |    Box                 |  4-wires  +----------+
+        +-------------+           |                        |
+        |             |  Cable-1  |                        |  Cable-3  +-----------+
+        | Arduino DB9 +  -------  + DB9-1            DB9-3 +  -------  + DB15 Step +  
+        |             |  9-wires  |                        |  3-wires  +-----------+
+        +-------------+           |                        |
+                                  |                        |  Cable-4  +------------+
+                                  |                  DB9-4 +  -------  + RFID Board |
+                                  |                        |  5-wires  +------------+
+                                  +------------------------+
+  
+      Notes:
+       - All connectors on boxes are DB9-male
+       - All connectors on cables are DB9-female.
+  
+  
+  
+  Junction-box wiring
+  -------------------
+  
+   Arduino to Detector
+   -------------------
+  
+      1. DB9-1,pin1 to DB9-2,pin8 (GND)
+      2. DB9-2,pin8 to DB9-2,pin9 (GND)
+      3. DB9-1,pin4 to DB9-2,pin2 (DET-GATE)
+      4. DB9-1,pin9 to DB9-2,pin5 (DET-VCC)
+  
+   Arduino to Stepper controller
+   -----------------------------
+  
+      1. DB9-1,pin5 to DB9-3,pin1 (5V)
+      2. DB9-1,pin8 to DB9-3,pin2 (STEP-PHASE-1)
+      3. DB9-1,pin3 to DB9-3,pin3 (STEP-PHASE-2)
+  
+   Arduino to RFID reader
+   ----------------------
+  
+      1. DB9-1,pin1 to DB9-4,pin1 (GND)
+      2. DB9-1,pin2 to DB9-4,pin2 (RFID-TIR)
+      3. DB9-1,pin6 to DB9-4,pin3 (RFID-RX)
+      4. DB9-1,pin7 to DB9-4,pin4 (RFID-RST)
+      5. DB9-1,pin5 to DB9-4,pin5 (5V)
+  
+  
+  
+  Cables
+  ------
+  
+   Cable-1
+   -------
+  
+    - Connects the Arduino to the Junction-box
+    - 9 wire cable, one-to-one connections
+    - DB9-female to DB9-female
+    - Pin functions:
+  
+       1. - GND          - Signal ground from Arduino
+       2. - RFID-TIR     - Tag-in-range fro RFID reader
+       3. - STEP-PHASE-2 - Phase 2 of the stepper controller
+       4. - DET-GATE     - Detector gate (LOW - slit detected, HIGH - no slit)
+       5. - 5V           - Power supply from Arduino
+       6. - RFID-RX      - Serial Rx from RFID reader
+       7. - RFID-RST     - Reset for the RFID reader
+       8. - STEP-PHASE-1 - Phase 1 of the stepper controller
+       9. - DET-VCC      - Power supply to the dtector LED
+  
+  
+
+   Cable-2
+   -------
+  
+   - Connects the Junction-box to the photo detector
+   - 4-wires
+   - DB9-female to DB9-female
+   - Wires:
+
+       1. JBox,DB9-2,pin8 to Det,DB9,pin8 (GND)    (pins 8 and 9 are shorted)
+       2. JBox,DB9-2,pin9 to Det,DB9,pin9 (GND)    (pins 8 and 9 are shorted)
+       3. Jbox,DB9-2,pin5 to Det,DB9,pin5 (DET-VCC)
+       3. Jbox,DB9-2,pin2 to Det,DB9,pin2 (DET-GATE)
+  
+  
+
+   Cable-3
+   -------
+  
+   - Connects the Junction-box (DB9-3) to the Stepper controller (DB15)
+   - 3-wires
+   - DB9-female to DB15-male
+   - Wires:
+
+      1. JBox,DB9-3,pin1 to DB15,pin11 (5V)
+      2. JBox,DB9-3,pin2 to DB15,pin2  (STEP-PHASE-1)
+      3. JBox,DB9-3,pin3 to DB15,pin3  (STEP-PHASE-2)
+
+
+
+   Cable-4
+   -------
+
+   - Connects the Junction-box (DB9-4) to the RFID reader Vero board
+   - 5-wires
+   - Wires:
+
+      1. DB9-4,pin1 to (GND)
+      2. DB9-4,pin2 to (RFID-TIR)
+      3. DB9-4,pin3 to (RFID-RX)
+      4. DB9-4,pin4 to (RFID-RST)
+      5. DB9-4,pin5 to (5V)
