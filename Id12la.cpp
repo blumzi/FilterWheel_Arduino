@@ -2,7 +2,6 @@
 #include <inttypes.h>
 #include "Id12la.h"
 #include "Ascii.h"
-#include "Debug.h"
 
 //
 // This class drives a Id12la RFID reader from ID-Innovations
@@ -31,6 +30,9 @@ extern void blink(int, int);
 Ascii ascii;
 byte buf[TagTransmissionBytes];
 const int io_blink_on = 20, io_blink_off = 20;
+
+extern void debug(String);
+extern void debugln(String);
 
 #ifdef USE_SOFTWARE_SERIAL
 
@@ -83,7 +85,7 @@ void Id12la::begin() {
 //  it will send the last successful one
 //
 void Id12la::reset() {
-	debugln("resetting...");
+	debugln("Id12la: resetting ...");
 	digitalWrite(this->_resetPin, LOW);
 	digitalWrite(this->_resetPin, HIGH);
 	delay(250);

@@ -1,7 +1,6 @@
 #include <Stepper.h>
 #include "Id12la.h"
 #include "Ascii.h"
-#include "Debug.h"
 
 //
 // Glossary:
@@ -60,6 +59,8 @@
 //			- The arduino will perform exactly the same procedure as for the 'get-tag' command
 //
 
+bool debugging = false;			// Turned on when PIN7 is grounded
+const int DEBUG_PIN = 7;
 
 const int STEPPER_STEPS_PER_REV = 1600;
 const int STEPPER_NORMAL_SPEED = 37;
@@ -109,21 +110,22 @@ int readPacketFromHost() {
 	if (!Serial.available())
 		return 0;
 
-	// clean the hostInBuf
-	for (p = hostInBuf; (unsigned)(p - hostInBuf) < sizeof(hostInBuf); p++)
+	memset(hostInBuf, 0, sizeof(hostInBuf));
+	if (debugging) {
+		for (p = hostInBuf; ; p++) {
+			while (!Serial.available())
+				delay(10);
+			*p = Serial.read();
+			if (*p == Ascii::NL)
+				break;
+		}
+	} else {
+		Serial.readStringUntil(Ascii::STX);
+		Serial.readBytesUntil(Ascii::ETX, hostInBuf, sizeof(hostInBuf));
+	}
+	if (((p = strchr(hostInBuf, Ascii::NL)) != NULL) || ((p = strchr(hostInBuf, Ascii::CR)) != NULL))
 		*p = 0;
 
-	for (p = hostInBuf; (unsigned)(p - hostInBuf) < sizeof(hostInBuf); p++) {
-		while (!Serial.available())
-			;
-		*p = Serial.read();
-		if (*p == Ascii::CR || *p == Ascii::NL) {
-			*p = 0;
-			break;
-		}
-	}
-
-	// TODO: checksum;
 	return p - hostInBuf;
 }
 
@@ -131,9 +133,11 @@ int readPacketFromHost() {
 // Sends a packet to the PC
 //
 void sendPacketToHost(String payload) {
-	debug("reply: ");
-	debugln(payload);
+	if (!debugging)
+		Serial.write(Ascii::STX);
 	Serial.println(payload);
+	if (!debugging)
+		Serial.write(Ascii::ETX);
 }
 
 //
@@ -190,6 +194,10 @@ void blink(int onMillis = blink_led_on, int offMillis = blink_led_off) {
 }
 
 void setup() {
+	pinMode(DEBUG_PIN, INPUT_PULLUP);
+
+	debugging = digitalRead(DEBUG_PIN) == LOW;
+
 	pinMode(LED_PIN, OUTPUT);
 	lookAlive();
 
@@ -219,16 +227,19 @@ void setup() {
 //  the slit.
 //
 bool slitDetected() {
-	bool detected = digitalRead(DETECTOR_GATE_PIN) == LOW;
-
-	debug(detected ? 'X' : 'x');
-	return detected;
+	for (int i = 0; i < 10; i++)
+		if (digitalRead(DETECTOR_GATE_PIN) == LOW) {
+			debug(String('X'));
+			return true;
+		}
+	debug(String('x'));
+	return false;
 }
 
 void detectorLED(bool onOff) {
 	digitalWrite(DETECTOR_VCC_PIN, onOff ? HIGH : LOW);
 	if (onOff == true)
-		delay(10);
+		delay(100);
 }
  
 //
@@ -239,8 +250,8 @@ void detectorLED(bool onOff) {
 String doGetTag() {
 	String tag;
 
-	//if (!lookForSlit())
-	//	return String("error:Cannot find slit");
+	if (!lookForSlit())
+		return String("error:Cannot find slit");
 
 	tag = tagReader.read();
 	if (tag.startsWith("error:"))
@@ -256,18 +267,18 @@ String doGetTag() {
 String doMove(int positions) {
 	int steps = positions * STEPPER_STEPS_PER_REV;
 
-	debug("moving: ");
-	debug(steps);
-	debugln(" steps");
+	debugln("moving: " + String(steps) + " steps");
 
 	stepper.step(steps);
 	return doGetTag();
 }
 
+// Performs a number of steps
 void doStep(int steps) {
 	stepper.step(steps);
 }
 
+// Let the world know we're alive
 void lookAlive() {
 	if ((long)(millis() - nextLookAlive) >= 0) {
 		blink();
@@ -276,17 +287,18 @@ void lookAlive() {
 	}
 }
 
+// Main loop
 void loop() {
 	String command, reply;
 	const int maxPositionsToMove = 7;
 	int positions, nBytesRead;
 
+	debugging = digitalRead(DEBUG_PIN) == LOW;
 	lookAlive();
 
 	if ((nBytesRead = readPacketFromHost()) > 0) {
 		command = String(hostInBuf);
-		debug("command: ");
-		debugln(command);
+		debugln("command: " + command);
 
 		if (command.startsWith("get-tag", 0)) {
 			reply = doGetTag();
@@ -324,4 +336,15 @@ void loop() {
 		if (reply.length() > 0)
 			sendPacketToHost(reply);
 	}
+}
+
+void debug(String message) {
+	if (!debugging)
+		return;
+
+	Serial.print(message);
+}
+
+void debugln(String message) {
+	debug(message + "\n");
 }

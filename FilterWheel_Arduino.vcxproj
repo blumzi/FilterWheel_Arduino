@@ -81,7 +81,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Ascii.h" />
-    <ClInclude Include="Debug.h" />
     <ClInclude Include="Id12la.h" />
     <ClInclude Include="__vm\.FilterWheel_Arduino.vsarduino.h" />
   </ItemGroup>
@@ -91,6 +90,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="FW-JunctionBox-Wiring.txt" />
+    <Text Include="Tags.txt" />
   </ItemGroup>
   <PropertyGroup>
     <DebuggerFlavor>VisualMicroDebugger</DebuggerFlavor>

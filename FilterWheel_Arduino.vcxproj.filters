@@ -27,9 +27,6 @@
     <ClInclude Include="Id12la.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Debug.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Ascii.cpp">
@@ -41,6 +38,9 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="FW-JunctionBox-Wiring.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="Tags.txt">
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>
