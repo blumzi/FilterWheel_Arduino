@@ -60,7 +60,7 @@
 //
 
 bool debugging = false;			// Turned on when PIN7 is grounded
-const int DEBUG_PIN = 7;
+const int DEBUG_PIN = 26;
 
 const int STEPPER_STEPS_PER_REV = 1600;
 const int STEPPER_NORMAL_SPEED = 37;
@@ -116,7 +116,7 @@ int readPacketFromHost() {
 			while (!Serial.available())
 				delay(10);
 			*p = Serial.read();
-			if (*p == Ascii::NL)
+			if (*p == Ascii::NL || *p == Ascii::CR)
 				break;
 		}
 	} else {
@@ -346,5 +346,5 @@ void debug(String message) {
 }
 
 void debugln(String message) {
-	debug(message + "\n");
+	debug(message + "\r\n");
 }
