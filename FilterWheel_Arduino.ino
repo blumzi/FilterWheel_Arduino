@@ -71,6 +71,10 @@ const int STEPPER_PHASE2_PIN = 36;
 const int DETECTOR_GATE_PIN = 32;
 const int DETECTOR_VCC_PIN = 30;
 
+const int CONNECTOR_DETECT_2 = 41;  // when LOW, detects connector #2 
+const int CONNECTOR_DETECT_3 = 43;  // when LOW, detects connector #3
+const int CONNECTOR_DETECT_4 = 45;  // when LOW, detects connector #4
+
 const int RFID_RESET_PIN = 48;
 const int RFID_TIR_PIN = 50;
 const int RFID_RX_PIN = 52;
@@ -196,17 +200,21 @@ void blink(int onMillis = blink_led_on, int offMillis = blink_led_off) {
 void setup() {
 	pinMode(DEBUG_PIN, INPUT_PULLUP);
 
+  pinMode(CONNECTOR_DETECT_2, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_3, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_4, INPUT_PULLUP);  
+
 	debugging = digitalRead(DEBUG_PIN) == LOW;
 
 	pinMode(LED_PIN, OUTPUT);
 	lookAlive();
 
-	Serial.begin(57600);	// opens serial port, sets data rate to 9600 bps
+	Serial.begin(57600);	// opens serial port, sets data rate to 57600 bps
 	while (!Serial)
 		;
 	tagReader.begin();
 
-	stepper.setSpeed(STEPPER_NORMAL_SPEED);//define  the stepper speed
+	stepper.setSpeed(STEPPER_NORMAL_SPEED);    //define  the stepper speed
 
 	// optical-gate pins
 	pinMode(DETECTOR_VCC_PIN, OUTPUT);         // LED power
@@ -241,15 +249,35 @@ void detectorLED(bool onOff) {
 	if (onOff == true)
 		delay(100);
 }
- 
+
+String checkConnectors() {
+  bool c2 = digitalRead(CONNECTOR_DETECT_2) == HIGH;  // HIGH == not-connected
+  bool c3 = digitalRead(CONNECTOR_DETECT_3) == HIGH;
+  bool c4 = digitalRead(CONNECTOR_DETECT_4) == HIGH;
+
+  if (c2 || c3 || c4) {
+    String msg = String("error:connector ");
+    
+    if (c2) msg += String("#2 ");
+    if (c3) msg += String("#3 ");
+    if (c4) msg += String("#4 ");
+    
+    return msg;
+  } else
+    return String("");
+}
+
 //
 // Tries to read the slot tag.
 // 1. Searches for the optical slit
 // 2. Reads the tag
 //
 String doGetTag() {
-	String tag;
+	String tag, err;
 
+  //if ((err = checkConnectors()) != "")
+  //  return err;
+  
 	if (!lookForSlit())
 		return String("error:Cannot find slit");
 
@@ -326,12 +354,12 @@ void loop() {
 			lookForSlit(nSteps);
 		}
 		else if (command.startsWith("help", 0) || command.startsWith("?", 0)) {
-			reply = String("commands:\n") +
-				String("  get-tag    - reads the RFID tag\n") +
-				String("  move-cw:N  - moves N slots clock-wise\n") +
-				String("  move-ccw:N - moves N slots counter-clock-wise\n") +
-				String("  step:N     - moves N steps clock-wise (steps < 0 => counter-clock-wise)\n") +
-				String("  search:N   - searches for the slit up-to N steps clock-wise, then counter-clock-wise");
+			reply = String("commands:\r\n") +
+				String("  get-tag    - reads the RFID tag\r\n") +
+				String("  move-cw:N  - moves N slots clock-wise\r\n") +
+				String("  move-ccw:N - moves N slots counter-clock-wise\r\n") +
+				String("  step:N     - moves N steps clock-wise (steps < 0 => counter-clock-wise)\r\n") +
+				String("  search:N   - searches for the slit up-to N steps clock-wise, then counter-clock-wise\r\n");
 		}
 		if (reply.length() > 0)
 			sendPacketToHost(reply);
