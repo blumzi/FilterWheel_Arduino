@@ -1,0 +1,395 @@
+#include <Stepper.h>
+#include "Id12la.h"
+#include "Ascii.h"
+
+//
+// Glossary:
+//  The following terms are used:
+//
+//	position:
+//		- there are 8 positions on the filter wheel, distanced 200
+//			steps (full motor revolution) one from the other.
+//		- on the 8-filter wheel there are filters (and RFID tags) at every position, on
+//			the 4-filter wheel only one in two positions has a filter (and RFID tag).
+//		- at each position the optical detector gate-pin goes LOW
+//
+// tag:
+//	- RFID tags are located on the filter wheel, to identify the filter positions.
+//	- the RFID reader will attempt to read the tags ONLY when the optical slit is detected.
+//	- an RFID tag has 10 HEX characters, e.g. "7F0007F75E".
+//	- an empty RFID tag indicates the reader could not read a tag.  This can occur if:
+//		- there is no tag, e.g. in odd positions on a 4-filter wheel
+//		- the existing tag is faulty
+//
+// revolution:
+//		- 1600 steps
+//
+//	speed:
+//		- the speed at which the stepper will rotate (STEPPER_NORMAL_SPEED)
+//
+//	direction:
+//		- the stepper direction: CW (positive number of steps) or CCW (negative number of steps)
+//
+//  Transport layer:
+//	  packet format:[STX][PAYLOAD][CRC 2][ETX]
+//		- Ascii::STX - one byte, ASCII:2 (start-of-text)
+//		- Ascii::ETX - one byte, ASCII:3 (end-of-text)
+//		- PAYLOAD - Even number of bytes (padded with NULL, if odd), ASCII printable characters ONLY
+//		- CRC - two bytes
+//
+//  Data layer:	command[:argument]
+//		- Commands may have optional arguments, separated by a colon (:)
+//
+//	Commands (always initiated by the PC):
+//
+//	1. Get position
+//		command: get-tag, argument: none
+//		reply:   tag:<tag> or tag:no-tag
+//		operation:
+//			- If optical slot is NOT detected, search for nearest position (up to half motor revolution, first CW then CCW)
+//			- When optical slot is detected, read RFID tag.
+//			- If a <tag> was read, reply: tag:<tag>
+//			- If no tag could be read, reply: tag:no-tag
+//
+//	2. Move CW or CCW
+//		command: move-cw:N or move-ccw:N
+//		reply:   tag:<tag> or tag:no-tag
+//		operation:
+//			- The arduino will rotate the motor N (default: 1) full revolution(s), in the specified direction
+//			- The arduino will perform exactly the same procedure as for the 'get-tag' command
+//
+
+const int DEBUG_PIN = 26;
+
+const int STEPPER_STEPS_PER_REV = 1600;
+const int STEPPER_NORMAL_SPEED = 37;
+
+const int STEPPER_PHASE1_PIN = 34;
+const int STEPPER_PHASE2_PIN = 36;
+
+const int DETECTOR_GATE_PIN = 32;
+const int DETECTOR_VCC_PIN = 30;
+
+const int CONNECTOR_DETECT_2 = 41;  // when LOW, detects connector #2 
+const int CONNECTOR_DETECT_3 = 43;  // when LOW, detects connector #3
+const int CONNECTOR_DETECT_4 = 45;  // when LOW, detects connector #4
+
+const int RFID_RESET_PIN = 48;
+const int RFID_TIR_PIN = 50;
+const int RFID_RX_PIN = 52;
+const int RFID_TX_PIN = 53;
+
+const int LED_PIN = 46;
+
+#define CW(steps) (steps)				// clock-wise direction
+#define CCW(steps) (-(steps))			// counter-clock-wise direction
+
+#define ON  true
+#define OFF false
+
+Stepper stepper(STEPPER_STEPS_PER_REV, STEPPER_PHASE1_PIN, STEPPER_PHASE2_PIN);
+
+const int blink_led_on = 500, blink_led_off = 500;
+unsigned long lookAliveInterval = 5000;
+unsigned long nextLookAlive = millis() + lookAliveInterval;
+
+char hostInBuf[256], hostOutBuf[256];
+
+#ifdef USE_SOFTWARE_SERIAL
+Id12la tagReader(RFID_RX_PIN, RFID_TX_PIN, RFID_RESET_PIN, RFID_TIR_PIN);
+#else
+Id12la tagReader(RFID_RESET_PIN, RFID_TIR_PIN);
+#endif
+
+//
+// reads a packet from the PC, on the Serial port
+// blocks until a good packet is received (bad packets are silently discarded)
+//
+// returns: number of characters read
+//
+int readPacketFromHost() {
+	char *p, c;
+
+	if (!Serial.available())
+		return 0;
+
+	memset(hostInBuf, 0, sizeof(hostInBuf));
+	if (debugging()) {
+		for (p = hostInBuf; ; p++) {
+			while (!Serial.available())
+				delay(10);
+			*p = Serial.read();
+			if (*p == Ascii::NL || *p == Ascii::CR)
+				break;
+		}
+	} else {
+    bool inPayload = false;
+    
+    for (p = hostInBuf; ; p++) {
+      c = Serial.read();
+
+      if (c ==  Ascii::STX) {
+        inPayload = true;
+        continue;
+      } else if (c == Ascii::ETX)
+          return;
+      else if (inPayload)
+        *p++ = c;
+    }
+    
+		//Serial.readStringUntil(Ascii::STX);
+		//Serial.readBytesUntil(Ascii::ETX, hostInBuf, sizeof(hostInBuf));
+	}
+	if (((p = strchr(hostInBuf, Ascii::NL)) != NULL) || ((p = strchr(hostInBuf, Ascii::CR)) != NULL))
+		*p = 0;
+
+	return p - hostInBuf;
+}
+
+//
+// Sends a packet to the PC
+//
+void sendPacketToHost(String payload) {
+	if (!debugging())
+		Serial.write(Ascii::STX);
+	Serial.println(payload);
+	if (!debugging())
+		Serial.write(Ascii::ETX);
+}
+
+//
+// Search for the optical slit.
+//  - maxSteps:  max number of steps to move in each direction
+//  - stepsPerMove: how much to move each time
+//
+bool lookForSlit(int maxSteps = (STEPPER_STEPS_PER_REV / 2) + 20, int stepsPerMove = 1) {
+	int count, slitWidth;
+	bool found = false;
+
+	detectorLED(ON);
+	if (slitDetected()) {
+		found = true;
+		goto out;
+	}
+
+	// Search CW
+	for (count = 1; count < maxSteps; count++) {
+		if (slitDetected()) {
+			for (slitWidth = 0; slitDetected(); slitWidth++)    // measure slit width
+				stepper.step(CW(1));
+			stepper.step(CCW(slitWidth / 2));                   // go back half slit width
+			found = true;
+			goto out;
+		}
+		stepper.step(CW(stepsPerMove));
+	}
+
+	stepper.step(CCW(maxSteps));	// go back
+
+	// Search CCW
+	for (count = 1; count < maxSteps; count++) {
+		if (slitDetected()) {
+			for (slitWidth = 0; slitDetected(); slitWidth++)    // measure slit width
+				stepper.step(CCW(1));
+			stepper.step(CW(slitWidth / 2));                    // go back half slit width
+			found = true;
+			goto out;
+		}
+		stepper.step(CCW(stepsPerMove));
+	}
+
+out:
+	detectorLED(OFF);
+	return found;
+}
+
+void blink(int nblinks, int onMillis = blink_led_on, int offMillis = blink_led_off) {
+  for (; nblinks; nblinks--) {
+	  digitalWrite(LED_PIN, HIGH);
+	  delay(onMillis);
+	  digitalWrite(LED_PIN, LOW);
+	  delay(offMillis);
+  }
+}
+
+void setup() {
+	pinMode(DEBUG_PIN, INPUT_PULLUP);
+
+  pinMode(CONNECTOR_DETECT_2, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_3, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_4, INPUT_PULLUP);
+
+	pinMode(LED_PIN, OUTPUT);
+	lookAlive();
+
+	Serial.begin(57600);	// opens serial port, sets data rate to 57600 bps
+	while (!Serial)
+		;
+	tagReader.begin();
+
+	stepper.setSpeed(STEPPER_NORMAL_SPEED);    //define  the stepper speed
+
+	// optical-gate pins
+	pinMode(DETECTOR_VCC_PIN, OUTPUT);         // LED power
+	detectorLED(OFF);
+
+	pinMode(DETECTOR_GATE_PIN, INPUT_PULLUP);  // HIGH: no slit, LOW: slit
+
+	debugln("filter wheel ready ...");
+
+	// Make sure we're positioned at a filter slot
+	lookForSlit();
+}
+
+//
+// The photo detector gate-pin drops to ground when
+//  it finds the positioning slit, and according to Ezra it
+//  is accurate, i.e. drops to ground if and only if it detected
+//  the slit.
+//
+bool slitDetected() {
+	for (int i = 0; i < 10; i++)
+		if (digitalRead(DETECTOR_GATE_PIN) == LOW) {
+			debugln(String('X'));
+			return true;
+		}
+	debugln(String('x'));
+	return false;
+}
+
+void detectorLED(bool onOff) {
+	digitalWrite(DETECTOR_VCC_PIN, onOff ? HIGH : LOW);
+	if (onOff == true)
+		delay(100);
+}
+
+String checkConnectors() {
+  bool c2 = digitalRead(CONNECTOR_DETECT_2) == HIGH;  // HIGH == not-connected
+  bool c3 = digitalRead(CONNECTOR_DETECT_3) == HIGH;
+  bool c4 = digitalRead(CONNECTOR_DETECT_4) == HIGH;
+
+  if (c2 || c3 || c4) {
+    String msg = String("error:connector ");
+    
+    if (c2) msg += String("#2 ");
+    if (c3) msg += String("#3 ");
+    if (c4) msg += String("#4 ");
+    
+    return msg;
+  } else
+    return String("");
+}
+
+//
+// Tries to read the slot tag.
+// 1. Searches for the optical slit
+// 2. Reads the tag
+//
+String doGetTag() {
+	String tag, err;
+
+  //if ((err = checkConnectors()) != "")
+  //  return err;
+  
+	if (!lookForSlit())
+		return String("error:Cannot find slit");
+
+	tag = tagReader.read();
+	if (tag.startsWith("error:"))
+		return tag;
+
+	return String("tag:") + tag;
+}
+
+//
+// Uses the stepper to rotate the wheel either CW or CCW (positions < 0).
+// The positions are spaced one full stepper revolution one from the other.
+//
+String doMove(int positions) {
+	int steps = positions * STEPPER_STEPS_PER_REV;
+
+	debugln("moving: " + String(steps) + " steps");
+
+	stepper.step(steps);
+	return doGetTag();
+}
+
+// Performs a number of steps
+void doStep(int steps) {
+	stepper.step(steps);
+}
+
+// Let the world know we're alive
+//void lookAlive() {
+//	if ((long)(millis() - nextLookAlive) >= 0) {
+//		blink();
+//		blink();
+//		nextLookAlive = millis() + lookAliveInterval;
+//	}
+//}
+
+// Main loop
+void loop() {
+	String command, reply;
+	const int maxPositionsToMove = 7;
+	int positions, nBytesRead;
+
+	//lookAlive();
+  blink(2);
+
+	if ((nBytesRead = readPacketFromHost()) > 0) {
+		command = String(hostInBuf);
+		debugln("command: " + command);
+
+		if (command.startsWith("get-tag", 0)) {
+			reply = doGetTag();
+		}
+		else if (command.startsWith("move-cw:", 0)) {
+			positions = command.substring(strlen("move-cw:")).toInt();
+			if (positions < 1 || positions > maxPositionsToMove)
+				reply = "error:bad-param";
+			else
+				reply = doMove(positions);
+		}
+		else if (command.startsWith("move-ccw:", 0)) {
+			positions = command.substring(strlen("move-ccw:")).toInt();
+			if (positions < 1 || positions > maxPositionsToMove)
+				reply = "error:bad-param";
+			else
+				reply = doMove(-positions);
+		}
+		else if (command.startsWith("step:", 0)) {
+			int nSteps = command.substring(strlen("step:")).toInt();
+			doStep(nSteps);
+		}
+		else if (command.startsWith("search:", 0)) {
+			int nSteps = command.substring(strlen("search:")).toInt();
+			lookForSlit(nSteps);
+		}
+		else if (command.startsWith("help", 0) || command.startsWith("?", 0)) {
+			reply = String("commands:\r\n") +
+				String("  get-tag    - reads the RFID tag\r\n") +
+				String("  move-cw:N  - moves N slots clock-wise\r\n") +
+				String("  move-ccw:N - moves N slots counter-clock-wise\r\n") +
+				String("  step:N     - moves N steps clock-wise (steps < 0 => counter-clock-wise)\r\n") +
+				String("  search:N   - searches for the slit up-to N steps clock-wise, then counter-clock-wise\r\n");
+		}
+		if (reply.length() > 0)
+			sendPacketToHost(reply);
+	}
+}
+
+bool debugging() {
+  return digitalRead(DEBUG_PIN) == LOW;
+}
+
+void debug(String message) {
+	if (!debugging())
+		return;
+
+	Serial.print(message);
+}
+
+void debugln(String message) {
+	debug(message + "\r\n");
+}

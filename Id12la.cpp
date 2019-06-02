@@ -25,11 +25,11 @@
 
 const int TagPayloadBytes = 10;
 const int TagTransmissionBytes = TagPayloadBytes + 6; // [STX][Payload(10)][CHK(2)][CR][NL][ETX]
-extern void blink(int, int);
+//extern void blink(int, int);
 
 Ascii ascii;
 byte buf[TagTransmissionBytes];
-const int io_blink_on = 20, io_blink_off = 20;
+//const int io_blink_on = 20, io_blink_off = 20;
 
 extern void debug(String);
 extern void debugln(String);
@@ -85,7 +85,7 @@ void Id12la::begin() {
 //  it will send the last successful one
 //
 void Id12la::reset() {
-	debugln("Id12la: resetting ...");
+	//debugln("Id12la: resetting ...");
 	digitalWrite(this->_resetPin, LOW);
 	digitalWrite(this->_resetPin, HIGH);
 	delay(250);
@@ -152,15 +152,17 @@ String Id12la::read() {
 			return String("error:Timeout");
 
 	while ((*p = readByte()) != Ascii::STX) // skip noise up to Ascii::STX
-		blink(io_blink_on, io_blink_off);
+		//blink(io_blink_on, io_blink_off);
+   ;
 	p++;
 	while ((*p++ = readByte()) != Ascii::ETX)
-		blink(io_blink_on, io_blink_off);
+		//blink(io_blink_on, io_blink_off);
+   ;
 	*p = 0;									// NULL terminate the buffer
 
 	for (int i = availableBytes(); i; i--) {// flush incoming data
 		readByte();
-		blink(io_blink_on, io_blink_off);
+		//blink(io_blink_on, io_blink_off);
 	}
 
 	status = dataArrivedSafely(p - buf);
