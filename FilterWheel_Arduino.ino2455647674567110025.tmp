@@ -70,9 +70,9 @@ const int STEPPER_PHASE2_PIN = 36;
 const int DETECTOR_GATE_PIN = 32;
 const int DETECTOR_VCC_PIN = 30;
 
-const int CD2_PIN = 41;  // when LOW, detects connector #2 
-const int CD3_PIN = 43;  // when LOW, detects connector #3
-const int CD4_PIN = 45;  // when LOW, detects connector #4
+const int CONNECTOR_DETECT_2 = 41;  // when LOW, detects connector #2 
+const int CONNECTOR_DETECT_3 = 43;  // when LOW, detects connector #3
+const int CONNECTOR_DETECT_4 = 45;  // when LOW, detects connector #4
 
 const int RFID_RESET_PIN = 48;
 const int RFID_TIR_PIN = 50;
@@ -110,58 +110,51 @@ Id12la tagReader(RFID_RESET_PIN, RFID_TIR_PIN);
 int readPacketFromHost() {
 	char *p, c;
 
-//	if (!Serial.available())
-//		return 0;
+	if (!Serial.available())
+		return 0;
 
 	memset(hostInBuf, 0, sizeof(hostInBuf));
-//	if (debugging()) {
-//		for (p = hostInBuf; ; p++) {
-//			while (!Serial.available())
-//				delay(10);
-//			*p = Serial.read();
-//			if (*p == Ascii::NL || *p == Ascii::CR)
-//				break;
-//		}
-//	} else {
-//    bool inPayload = false;
-//    
-//    for (p = hostInBuf; ; p++) {
-//      c = Serial.read();
-//
-//      if (c ==  Ascii::STX) {
-//        inPayload = true;
-//        continue;
-//      } else if (c == Ascii::ETX)
-//          return;
-//      else if (inPayload)
-//        *p++ = c;
-//    }
+	if (debugging()) {
+		for (p = hostInBuf; ; p++) {
+			while (!Serial.available())
+				delay(10);
+			*p = Serial.read();
+			if (*p == Ascii::NL || *p == Ascii::CR)
+				break;
+		}
+	} else {
+    bool inPayload = false;
+    
+    for (p = hostInBuf; ; p++) {
+      c = Serial.read();
+
+      if (c ==  Ascii::STX) {
+        inPayload = true;
+        continue;
+      } else if (c == Ascii::ETX)
+          return;
+      else if (inPayload)
+        *p++ = c;
+    }
     
 		//Serial.readStringUntil(Ascii::STX);
 		//Serial.readBytesUntil(Ascii::ETX, hostInBuf, sizeof(hostInBuf));
-    int nRead;
-    
-    if ((nRead = Serial.readBytesUntil('\r', hostInBuf, sizeof(hostInBuf))) > 0) {
-      hostInBuf[nRead] = 0;
-      //debugln("got ==" + String(hostInBuf) + "==");
-      return nRead;
-    }
-//	}
-//	if (((p = strchr(hostInBuf, Ascii::NL)) != NULL) || ((p = strchr(hostInBuf, Ascii::CR)) != NULL))
-//		*p = 0;
+	}
+	if (((p = strchr(hostInBuf, Ascii::NL)) != NULL) || ((p = strchr(hostInBuf, Ascii::CR)) != NULL))
+		*p = 0;
 
-	return 0;
+	return p - hostInBuf;
 }
 
 //
 // Sends a packet to the PC
 //
 void sendPacketToHost(String payload) {
-//	if (!debugging())
-//		Serial.write(Ascii::STX);
+	if (!debugging())
+		Serial.write(Ascii::STX);
 	Serial.println(payload);
-//	if (!debugging())
-//		Serial.write(Ascii::ETX);
+	if (!debugging())
+		Serial.write(Ascii::ETX);
 }
 
 //
@@ -222,12 +215,12 @@ void blink(int nblinks, int onMillis = blink_led_on, int offMillis = blink_led_o
 void setup() {
 	pinMode(DEBUG_PIN, INPUT_PULLUP);
 
-  pinMode(CD2_PIN, INPUT_PULLUP);
-  pinMode(CD3_PIN, INPUT_PULLUP);
-  pinMode(CD4_PIN, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_2, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_3, INPUT_PULLUP);
+  pinMode(CONNECTOR_DETECT_4, INPUT_PULLUP);
 
 	pinMode(LED_PIN, OUTPUT);
-	//lookAlive();
+	lookAlive();
 
 	Serial.begin(57600);	// opens serial port, sets data rate to 57600 bps
 	while (!Serial)
@@ -242,11 +235,10 @@ void setup() {
 
 	pinMode(DETECTOR_GATE_PIN, INPUT_PULLUP);  // HIGH: no slit, LOW: slit
 
-	//debugln("filter wheel ready ...");
+	debugln("filter wheel ready ...");
 
 	// Make sure we're positioned at a filter slot
 	lookForSlit();
-  blink(5);
 }
 
 //
@@ -258,10 +250,10 @@ void setup() {
 bool slitDetected() {
 	for (int i = 0; i < 10; i++)
 		if (digitalRead(DETECTOR_GATE_PIN) == LOW) {
-			//debugln(String('X'));
+			debugln(String('X'));
 			return true;
 		}
-	//debugln(String('x'));
+	debugln(String('x'));
 	return false;
 }
 
@@ -272,33 +264,20 @@ void detectorLED(bool onOff) {
 }
 
 String checkConnectors() {
-  bool c2 = digitalRead(CD2_PIN) == HIGH;  // HIGH == not-connected
-  bool c3 = digitalRead(CD3_PIN) == HIGH;
-  bool c4 = digitalRead(CD4_PIN) == HIGH;
+  bool c2 = digitalRead(CONNECTOR_DETECT_2) == HIGH;  // HIGH == not-connected
+  bool c3 = digitalRead(CONNECTOR_DETECT_3) == HIGH;
+  bool c4 = digitalRead(CONNECTOR_DETECT_4) == HIGH;
 
   if (c2 || c3 || c4) {
-    String msg = String("error:connector:");
+    String msg = String("error:connector ");
     
-    if (c2) msg += String("2 ");
-    if (c3) msg += String("3 ");
-    if (c4) msg += String("4 ");
-
-    msg.trim();
+    if (c2) msg += String("#2 ");
+    if (c3) msg += String("#3 ");
+    if (c4) msg += String("#4 ");
+    
     return msg;
   } else
-    return "";
-}
-
-String getConnectorDetectPins() {
-  String msg = String("");
-
-  msg += String("CD2_PIN: ")   + String(digitalRead(CD2_PIN) == HIGH ? "not-connected" : "connected");
-  msg += String(", CD3_PIN: ") + String(digitalRead(CD3_PIN) == HIGH ? "not-connected" : "connected");
-  msg += String(", CD4_PIN: ") + String(digitalRead(CD4_PIN) == HIGH ? "not-connected" : "connected");
-  msg += String("\r\n");
-  msg += checkConnectors() + String("\r\n");
-
-  return msg;
+    return String("");
 }
 
 //
@@ -329,7 +308,7 @@ String doGetTag() {
 String doMove(int positions) {
 	int steps = positions * STEPPER_STEPS_PER_REV;
 
-	//debugln("moving: " + String(steps) + " steps");
+	debugln("moving: " + String(steps) + " steps");
 
 	stepper.step(steps);
 	return doGetTag();
@@ -360,7 +339,7 @@ void loop() {
 
 	if ((nBytesRead = readPacketFromHost()) > 0) {
 		command = String(hostInBuf);
-		//debugln("command: " + command);
+		debugln("command: " + command);
 
 		if (command.startsWith("get-tag", 0)) {
 			reply = doGetTag();
@@ -387,15 +366,11 @@ void loop() {
 			int nSteps = command.substring(strlen("search:")).toInt();
 			lookForSlit(nSteps);
 		}
-    else if (command.startsWith("cd")) {
-      reply = getConnectorDetectPins();
-    }
 		else if (command.startsWith("help", 0) || command.startsWith("?", 0)) {
 			reply = String("commands:\r\n") +
 				String("  get-tag    - reads the RFID tag\r\n") +
 				String("  move-cw:N  - moves N slots clock-wise\r\n") +
 				String("  move-ccw:N - moves N slots counter-clock-wise\r\n") +
-        String("  cdpins     - show the status of the connector detect pins\r\n") +
 				String("  step:N     - moves N steps clock-wise (steps < 0 => counter-clock-wise)\r\n") +
 				String("  search:N   - searches for the slit up-to N steps clock-wise, then counter-clock-wise\r\n");
 		}
@@ -409,8 +384,8 @@ bool debugging() {
 }
 
 void debug(String message) {
-//	if (!debugging())
-//		return;
+	if (!debugging())
+		return;
 
 	Serial.print(message);
 }
