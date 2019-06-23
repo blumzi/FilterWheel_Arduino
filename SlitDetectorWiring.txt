@@ -1,0 +1,56 @@
+
+
+    We're using an optical gate to detect the positioning slit.
+
+    The component used is a H21B1 by FAIRCHILD (Photodarlington Optical
+    Interrupter Switch).
+
+    The component has four pins:
+        - two on the EMITER side (an infra-red LED)
+        - two on the DETECTOR side (a Darlinton transistor)
+
+
+        The EMITER side is chamfered.
+        
+              Chamfer
+                --> /---+   +---+
+                    |   |   |   |
+       Front        |   |   |   |
+       view     +---+   +---+   +---+
+                |                   |
+                +-------------------+
+        
+
+             Chamfer|  
+                    v 1       4
+                +___++--+___+---+___+
+        Top     |   ||+ |   | D |   |
+        view    |   ||  |   |   |   |
+                |   ||E |   | + |   |
+                +___++--+___+---+___+
+                      2       3
+
+
+    The H21B1 component is connected via a 4 wire cable (#2) to a DB9 Female connector:
+
+        H121B1  DB9  Function               Connects to
+          Pin   Pin                         Arduino Pin
+        ------  ---  --------               -----------
+           1     5   Power to the IR LED    30 (via a 430 Ohm resistor)
+           2     8   GND
+           3     2   Detector output        32 (pulled up with a 1 KOhm resistor)
+           4     8   GND
+
+
+    The DB9 female connector (#2) has a "cable detect" feature. Pin 1 is
+    shorted to pin 8 (GND).
+        
+                 1 -+
+                    | Connector detect (CD2)
+                 8 -+
+
+    Pin 1 is carried via the Junction-Box to the Arduino pin 41.
+
+    The Arduino uses pin 41 as follows:
+     - when HIGH - cable #2 is not-connected
+     - when LOW  - cable #2 is conected

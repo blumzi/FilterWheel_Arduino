@@ -10,56 +10,62 @@
    Step: The stepper motor controller module.
    Opti: The optical slit detector module.
   
+
   
   Connections diagram
-  -------------------
-  
-                                   +------------------------+
-                                   |                        |  Cable-2  +-----------+
-                                   |  Junction        DB9-2 +  -------  + Opti Det  |
-                                   |    Box                 |  4-wires  +-----------+
-        +-------------+            |                        |
-        |             |  Cable-1   |                        |  Cable-3  +------------+
-        | Ardu DB15   +  --------  + DB15             DB9-3 +  -------  + DB15 Step  +  
-        |             |  15-wires  |                        |  3-wires  +------------+
-        +-------------+            |                        |
-                                   |                        |  Cable-4  +------------+
-                                   |                  DB9-4 +  -------  + RFID Board |
-                                   |                        |  5-wires  +------------+
-                                   +------------------------+
+  ===================
+                                    Junction
+                                      Box
+                                 +------------------------+
+                                 |                        |  Cable-2   +------+
+                                 |                  DB9-2 +  --------  + Opti |
+      +-------------+            |                        |  5-wires   +------+
+      |             |            |                        |
+      |   Arduino   |  Cable-1   |                        |  Cable-3   +------+
+      |      DB15   +  --------  + DB15             DB9-3 +  --------  + Step |
+      |             |  12-wires  |                        |  4-wires   +------+
+      +-------------+            |                        |
+                                 |                        |  Cable-4   +------+
+                                 |                  DB9-4 +  --------  + Rfid |
+                                 |                        |  6-wires   +------+
+                                 +------------------------+
+
   
   Junction-box wiring
-  -------------------
+  ===================
   
    Arduino to Optical Slit Detector (internal cable 2)
    ---------------------------------------------------
   
-      1. DB15[1]  to DB9-2[8] (GND) -+ (shorted to 2)
-      2.             DB9-2[9] (GND) -+ (shorted to 1)
-      3. DB15[4]  to DB9-2[2] (OPTI-GATE)
-      4. DB15[8]  to DB9-2[5] (OPTI-VCC) (Note: this is OUT pin 30, not Vcc)
-      5. DB15[10] to DB9-2[1] (CD2)
+      1. (a-GND) DB15[1]  to DB9-2[8] (GND) -+ (shorted to 2)
+      2,                   DB9-2[9] (GND) -+ (shorted to 1)
+      3. (a-32)  DB15[4]  to DB9-2[2] (OPTI-GATE)
+      4. (a-30)  DB15[8]  to DB9-2[5] (OPTI-VCC) (Note: this is OUT pin 30, not Vcc)
+      5. (a-41)  DB15[10] to DB9-2[1] (CD2)
   
    Arduino to Stepper controller (internal cable 3)
    ------------------------------------------------
   
-      1. DB15[9] to DB9-3[1] (5V)
-      2. DB15[6] to DB9-3[2] (STEP-PHASE-1)
-      3. DB15[5] to DB9-3[3] (STEP-PHASE-2)
+      1. (a-5v)  DB15[9]  to DB9-3[1] (5v)
+      2. (a-34)  DB15[6]  to DB9-3[2] (STEP-PHASE-1)
+      3. (a-36)  DB15[5]  to DB9-3[3] (STEP-PHASE-2)
+      5. (a-GND) DB15[1]  to DB9-3[4] (GND)
+      5. (a-43)  DB15[11] to DB9-3[5] (CD3)
   
    Arduino to RFID reader (internal cable 4)
    -----------------------------------------
   
-      1. DB15[1] to DB9-4[1] (GND)
-      2. DB15[3] to DB9-4[2] (RFID-TIR)
-      3. DB15[2] to DB9-4[3] (RFID-RX)
-      4. DB15[7] to DB9-4[4] (RFID-RST)
-      5. DB15[5] to DB9-4[5] (5V)
+      1. (a-GND) DB15[1]  to DB9-4[1] (GND)
+      2. (a-50)  DB15[3]  to DB9-4[2] (RFID-TIR)
+      3. (a-52)  DB15[2]  to DB9-4[3] (RFID-RX)
+      4. (a-48)  DB15[7]  to DB9-4[4] (RFID-RST)
+      5. (a-5v)  DB15[5]  to DB9-4[5] (5v)
+      6. (a-45)  DB15[12] to DB9-4[6] (CD4)
   
   
   
-  Cables
-  ------
+  External Cables
+  ===============
   
    Cable-1
    -------
@@ -69,49 +75,49 @@
     - DB15-female to DB15-female
     - Pin functions:
   
-       1. - (55) - GND          - Signal ground from Arduino
-       2. - (52) - RFID-RX      - Serial Rx from RFID reader
-       3. - (50) - RFID-TIR     - Tag-in-range fro RFID reader
-       4. - (48) - RFID-RST     - Reset for the RFID reader
-       5. - (36) - STEP-PHASE-2 - Phase 2 of the stepper controller
-       6. - (34) - STEP-PHASE-1 - Phase 1 of the stepper controller
-       7. - (32) - OPTI-GATE    - Optical slit detector gate (LOW - slit detected, HIGH - no slit)
-       8. - (30) - OPTI-VCC     - Power supply to the optical detector LED
-       9. - (5V) - VCC          - Power supply from Arduino
-      10. - (41) - CD2		    - Connector 2 detect
-      11. - (43) - CD3		    - Connector 3 detect
-      12. - (45) - CD4		    - Connector 4 detect
-      13. - NC		            - Not connected
-      14. - NC		            - Not connected
-      15. - NC		            - Not connected
+      1. (a-55) - GND          - Signal ground from Arduino
+      2. (a-52) - RFID-RX      - Serial Rx from RFID reader
+      3. (a-50) - RFID-TIR     - Tag-in-range fro RFID reader
+      4. (a-48) - RFID-RST     - Reset for the RFID reader
+      5. (a-36) - STEP-PHASE-2 - Phase 2 of the stepper controller
+      6. (a-34) - STEP-PHASE-1 - Phase 1 of the stepper controller
+      7. (a-32) - OPTI-GATE    - Optical slit detector gate (LOW - slit detected, HIGH - no slit)
+      8. (a-30) - OPTI-VCC     - Power supply to the optical detector LED
+      9. (a-5v) - VCC          - Power supply from Arduino
+     10. (a-41) - CD2          - Connector 2 detect
+     11. (a-43) - CD3          - Connector 3 detect
+     12. (a-45) - CD4          - Connector 4 detect
   
 
    Cable-2
    -------
   
    - Connects the Junction-box (DB9-2) to the optical gate detector
-   - 4-wires
+   - 5-wires
    - DB9-female to DB9-female
    - Wires:
 
-       1. JBox,DB9-2[8] to Opti,DB9[8] (GND)    (pins 8 and 9 are shorted)
-       2. JBox,DB9-2[9] to Opti,DB9[9] (GND)    (pins 8 and 9 are shorted)
-       3. Jbox,DB9-2[5] to Opti,DB9[5] (OPTI-VCC)
-       4. Jbox,DB9-2[2] to Opti,DB9[2] (OPTI-GATE)
+      1. (a-GND) DB9-2[8] to Opti[8] (GND)      (pins 8 and 9 are shorted)
+      2. (a-GND) DB9-2[9] to Opti[9] (GND)      (pins 8 and 9 are shorted)
+      3. (a-30)  DB9-2[5] to Opti[5] (OPTI-VCC)
+      4. (a-32)  DB9-2[2] to Opti[2] (OPTI-GATE)
+      5. (a-41)   Opti[1] to Opti[8] (CD3)
   
   
 
    Cable-3
    -------
   
-   - Connects the Junction-box (DB9-3) to the Stepper controller (DB15)
-   - 3-wires
+   - Connects the DB9-3 of the Junction-box to the Stepper controller
+   - 5-wires
    - DB9-female to DB15-male
    - Wires:
 
-      1. JBox,DB9-3[1] to DB15[1]1 (5V)
-      2. JBox,DB9-3[2] to DB15[2]  (STEP-PHASE-1)
-      3. JBox,DB9-3[3] to DB15[3]  (STEP-PHASE-2)
+      1. (a-5v)  DB9-3[1] to Step[1]  (5v)
+      2. (a-34)  DB9-3[2] to Step[2]  (STEP-PHASE-1)
+      3. (a-36)  DB9-3[3] to Step[3]  (STEP-PHASE-2)
+      4. (a-GND) DB9-3[4] to Step[9]
+      5. (a-43)   Step[5] to Step[8]  (CD3)
 
 
 
@@ -119,11 +125,12 @@
    -------
 
    - Connects the Junction-box (DB9-4) to the RFID reader Vero board
-   - 5-wires
+   - 6-wires
    - Wires:
 
-      1. DB9-4[1] to (GND)
-      2. DB9-4[2] to (RFID-TIR)	(50)
-      3. DB9-4[3] to (RFID-RX)	(52)
-      4. DB9-4[4] to (RFID-RST)	(48)
-      5. DB9-4[5] to (5V)
+      1. (a-GND) DB9-4[1] to Rfid[1]    (GND)
+      2. (a-50)  DB9-4[2] to Rfid[2]    (RFID-TIR)
+      3. (a-52)  DB9-4[3] to Rfid[3]    (RFID-RX)
+      4. (a-48)  DB9-4[4] to Rfid[4]    (RFID-RST)
+      5. (a-VCC) DB9-4[5] to Rfid[5]    (5v)
+      6. (a-45)  Rfid[x]  to Rfid[6]    (CD4)

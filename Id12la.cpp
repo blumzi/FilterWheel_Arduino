@@ -141,7 +141,7 @@ String Id12la::read() {
 	String status;
 
 	if (!tagInRange())
-		return String("error:No tag in range");
+		return String("error:no-tag");
 
 	clearBufs();                            // clear read buffer and tag areas
 	reset();                                // force reader to take a reading
