@@ -19,17 +19,18 @@ class Id12la
 #else
 		Id12la(uint8_t reset_pin, uint8_t tir_pin);
 #endif
-        String read();
-        void begin();
+    String read();
+    void begin();
 
     private:
 #ifdef USE_SOFTWARE_SERIAL
 		uint8_t _rxPin;
 		uint8_t _txPin;
 #endif
-       uint8_t _resetPin;	// out - forces the reader to take a read
+     uint8_t _resetPin;	// out - forces the reader to take a read
 	   uint8_t _tirPin;		// in  - tag-in-range pin
-       void reset();
+     void resetChip();
+     void unresetChip();
 	   bool tagInRange();
 };
 

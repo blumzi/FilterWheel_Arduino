@@ -45,7 +45,8 @@ Id12la::Id12la(uint8_t rxPin, uint8_t txPin, uint8_t resetPin, uint8_t tirPin) {
 	this->_tirPin = tirPin;
 
 	pinMode(this->_resetPin, OUTPUT);
-	digitalWrite(this->_resetPin, HIGH);
+	//digitalWrite(this->_resetPin, HIGH);
+  digitalWrite(this->_resetPin, LOW);
 
 	pinMode(this->_tirPin, INPUT);
 
@@ -58,7 +59,8 @@ Id12la::Id12la(uint8_t resetPin, uint8_t tirPin) {
 	this->_tirPin = tirPin;
 
 	pinMode(this->_resetPin, OUTPUT);
-	digitalWrite(this->_resetPin, HIGH);
+	//digitalWrite(this->_resetPin, HIGH);
+  digitalWrite(this->_resetPin, LOW);
 
 	pinMode(this->_tirPin, INPUT);
 }
@@ -80,15 +82,14 @@ void Id12la::begin() {
 	ascii = Ascii();
 }
 
-//
-// Force the ID12LA to take another reading, otherwise
-//  it will send the last successful one
-//
-void Id12la::reset() {
-	//debugln("Id12la: resetting ...");
+void Id12la::resetChip() {
 	digitalWrite(this->_resetPin, LOW);
-	digitalWrite(this->_resetPin, HIGH);
-	delay(250);
+}
+
+void Id12la::unresetChip() {
+  digitalWrite(this->_resetPin, LOW);
+  digitalWrite(this->_resetPin, HIGH);
+  delay(250);
 }
 
 bool Id12la::tagInRange() {
@@ -137,40 +138,45 @@ String dataArrivedSafely(int nbytes) {
 //
 String Id12la::read() {
 	byte *p = buf;
-	unsigned long timeLimit;
+	unsigned long endOfTime;
 	String status;
 
-	if (!tagInRange())
+  unresetChip();
+  
+	if (!tagInRange()){
+    resetChip();
 		return String("error:no-tag");
+	}
 
-	clearBufs();                            // clear read buffer and tag areas
-	reset();                                // force reader to take a reading
-	timeLimit = micros() + 1000;
+	clearBufs();                            // clear read buffer
+	endOfTime = micros() + 1000;
 
 	while (availableBytes() < TagTransmissionBytes + 1)
-		if ((long)(micros() - timeLimit) >= 0)
-			return String("error:Timeout");
+		if ((long)(micros() - endOfTime) >= 0){
+      resetChip();
+			return String("error:timeout");
+		}
 
 	while ((*p = readByte()) != Ascii::STX) // skip noise up to Ascii::STX
-		//blink(io_blink_on, io_blink_off);
    ;
 	p++;
 	while ((*p++ = readByte()) != Ascii::ETX)
-		//blink(io_blink_on, io_blink_off);
    ;
 	*p = 0;									// NULL terminate the buffer
 
 	for (int i = availableBytes(); i; i--) {// flush incoming data
 		readByte();
-		//blink(io_blink_on, io_blink_off);
 	}
 
 	status = dataArrivedSafely(p - buf);
-	if (status.startsWith("error:"))
+	if (status.startsWith("error:")){
+    resetChip();
 		return status;
+	}
 
 	char *tag = (char*)buf + 1;
 	*(tag + TagPayloadBytes) = 0;			// NULL-terminate tag
 
+  resetChip();
 	return String(tag);
 }
