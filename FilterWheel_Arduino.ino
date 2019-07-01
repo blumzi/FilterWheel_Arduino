@@ -9,7 +9,7 @@
 //  The following terms are used:
 //
 //  position:
-//    - there are 8 positions on the filter wheel, distanced 200
+//    - there are 8 positions on the filter wheel, distanced STEPPER_STEPS_PER_REV
 //      steps (full motor revolution) one from the other.
 //    - on the 8-filter wheel there are filters (and RFID tags) at every position, on
 //      the 4-filter wheel only one in two positions has a filter (and RFID tag).
@@ -22,9 +22,6 @@
 //  - an empty RFID tag indicates the reader could not read a tag.  This can occur if:
 //    - there is no tag, e.g. in odd positions on a 4-filter wheel
 //    - the existing tag is faulty
-//
-// revolution:
-//    - 1600 steps
 //
 //  speed:
 //    - the speed at which the stepper will rotate (STEPPER_NORMAL_SPEED)
@@ -72,7 +69,7 @@ const int STEPPER_PHASE2_PIN = 36;
 const int SLIT_DETECTOR_GATE_PIN = 32;
 const int SLIT_DETECTOR_VCC_PIN = 30;
 
-const int CD2_PIN = 41;  // when LOW, detects connector #2 
+const int CD2_PIN = 41;  // when LOW, detects connector #2
 const int CD3_PIN = 43;  // when LOW, detects connector #3
 const int CD4_PIN = 45;  // when LOW, detects connector #4
 
@@ -110,48 +107,13 @@ Id12la tagReader(RFID_RESET_PIN, RFID_TIR_PIN);
 // returns: number of characters read
 //
 int readPacketFromHost() {
-  //char *p, c;
-
-//  if (!Serial.available())
-//    return 0;
-
   memset(hostInBuf, 0, sizeof(hostInBuf));
-//  if (debugging()) {
-//    for (p = hostInBuf; ; p++) {
-//      while (!Serial.available())
-//        delay(10);
-//      *p = Serial.read();
-//      if (*p == Ascii::NL || *p == Ascii::CR)
-//        break;
-//    }
-//  } else {
-//    bool inPayload = false;
-//    
-//    for (p = hostInBuf; ; p++) {
-//      c = Serial.read();
-//
-//      if (c ==  Ascii::STX) {
-//        inPayload = true;
-//        continue;
-//      } else if (c == Ascii::ETX)
-//          return;
-//      else if (inPayload)
-//        *p++ = c;
-//    }
-    
-    //Serial.readStringUntil(Ascii::STX);
-    //Serial.readBytesUntil(Ascii::ETX, hostInBuf, sizeof(hostInBuf));
-    int nRead;
-    
-    if ((nRead = Serial.readBytesUntil('\r', hostInBuf, sizeof(hostInBuf))) > 0) {
-      hostInBuf[nRead] = 0;
-      //debugln("got ==" + String(hostInBuf) + "==");
-      return nRead;
-    }
-//  }
-//  if (((p = strchr(hostInBuf, Ascii::NL)) != NULL) || ((p = strchr(hostInBuf, Ascii::CR)) != NULL))
-//    *p = 0;
 
+  int nRead;
+  if ((nRead = Serial.readBytesUntil('\r', hostInBuf, sizeof(hostInBuf))) > 0) {
+    hostInBuf[nRead] = 0;
+    return nRead;
+  }
   return 0;
 }
 
@@ -211,9 +173,9 @@ out:
 }
 
 /*
- * This is s synchronous blink, i.e. the program continues only after the 
- *  blinking is done.
- */
+   This is s synchronous blink, i.e. the program continues only after the
+    blinking is done.
+*/
 void blink(int nblinks, int onMillis = blink_led_on, int offMillis = blink_led_off) {
   for (; nblinks; nblinks--) {
     digitalWrite(LOOKALIVE_LED_PIN, HIGH);
@@ -236,7 +198,7 @@ void setup() {
   Serial.begin(57600);  // opens serial port, sets data rate to 57600 bps
   while (!Serial)
     ;
-  tagReader.begin();   
+  tagReader.begin();
 
   stepper.setSpeed(STEPPER_NORMAL_SPEED);    //define  the stepper speed
 
@@ -245,13 +207,18 @@ void setup() {
   SlitDetectorLed(OFF);
   pinMode(SLIT_DETECTOR_GATE_PIN, INPUT_PULLUP);  // HIGH: no slit, LOW: slit
 
-  // Make sure we're positioned at a filter slot
-  //lookForSlit();  // TBD: scoot a bit and look again, for 4 slot wheels
-
-  String tag = doGetTag(); 
+/*
+ * Try to read an RFID tag.  This will look for the nearby filter position and
+ *  attempt to read a tag.
+ */
+  String tag = doGetTag();
+  /*
+   * If there's no tag at this filter position scoot over one slot
+   *  and try again to read a tag, to accomodate the 4-position wheel.
+   */
   if (tag.startsWith("error:no-tag"))
     doMove(1);
-    
+
   blink(3);
 }
 
@@ -284,7 +251,7 @@ String checkConnectors() {
 
   if (c2 || c3 || c4) {
     String msg = String("error:connector:");
-    
+
     if (c2) msg += String("2 ");
     if (c3) msg += String("3 ");
     if (c4) msg += String("4 ");
@@ -296,8 +263,8 @@ String checkConnectors() {
 }
 
 /*
- * This is for debugging ONLY
- */
+   This is for debugging ONLY
+*/
 String getConnectorDetectPins() {
   String msg = String("");
 
@@ -310,22 +277,22 @@ String getConnectorDetectPins() {
   return msg;
 }
 
-//
-// Tries to read the slot tag.
-// 1. Searches for the optical slit
-// 2. Reads the tag
-//
+/*
+ * Tries to read the slot tag.
+ * 1. Searches for the optical slit
+ * 2. Reads the tag
+ */
 String doGetTag() {
   String reply;
 
   if ((reply = checkConnectors()) != "ok")
     return reply;
-  
+
   if (!lookForSlit())
     return String("error:no-slit");
 
   reply = tagReader.read();
-  if (reply.startsWith("error:no-tag")){
+  if (reply.startsWith("error:no-tag")) {
     /*
      * We found a slit but not a tag.  This may be a
      *  four-position wheel.  We'll move one position
@@ -338,10 +305,10 @@ String doGetTag() {
   return String("tag:") + reply;
 }
 
-//
-// Uses the stepper to rotate the wheel either CW or CCW (positions < 0).
-// The positions are spaced one full stepper revolution one from the other.
-//
+/*
+ * Uses the stepper to rotate the wheel either CW or CCW (positions < 0).
+ * The positions are spaced one full stepper revolution one from the other.
+ */
 String doMove(int positions) {
   stepper.step(positions * STEPPER_STEPS_PER_REV);
   return doGetTag();
@@ -358,9 +325,9 @@ void doStep(int steps) {
  * This is an asynchronous blink.  It is called from the main loop.
  */
 void lookAlive() {
-  static long unsigned int lookAlive_delay = 100;
+  static long unsigned int lookAlive_delay = 30;
   static long unsigned int intervals[] = {
-    lookAliveInterval + 10 * lookAlive_delay,	// 0: go high
+    lookAliveInterval + 20 * lookAlive_delay,	// 0: go high
     lookAliveInterval +  1 * lookAlive_delay,	// 1: go low
     lookAliveInterval +  2 * lookAlive_delay,	// 2: go high
     lookAliveInterval +  3 * lookAlive_delay,	// 3: go low and reset
@@ -387,10 +354,12 @@ String toggleSlitDetectorIRLed() {
   else
     SlitDetectorLed(ON);
 
-  return digitalRead(SLIT_DETECTOR_VCC_PIN) == HIGH ? "ON" : "OFF";    
+  return digitalRead(SLIT_DETECTOR_VCC_PIN) == HIGH ? "ON" : "OFF";
 }
 
-// Main loop
+/* 
+ *  Main loop
+ */
 void loop() {
   String command, reply;
   const int maxPositionsToMove = 7;
@@ -400,7 +369,6 @@ void loop() {
 
   if ((nBytesRead = readPacketFromHost()) > 0) {
     command = String(hostInBuf);
-    //debugln("command: " + command);
 
     if (command.startsWith("get-tag", 0) || command.startsWith("tag", 0)) {
       reply = doGetTag();
@@ -435,14 +403,14 @@ void loop() {
     }
     else if (command.startsWith("help", 0) || command.startsWith("?", 0)) {
       reply = String("commands:\r\n") +
-        String("  get-tag    - reads the RFID tag\r\n") +
-        String("  move-cw:N  - moves N slots clock-wise\r\n") +
-        String("  move-ccw:N - moves N slots counter-clock-wise\r\n") +
-        String("  cdpins     - show the status of the connector-detect pins\r\n") +
-        String("  step:N     - moves N steps clock-wise (steps < 0 => counter-clock-wise)\r\n") +
-        String("  l          - toggles slit detector Infra Red led\r\n") +
-        String("  d          - detects the slit\r\n") +
-        String("  search:N   - searches for the slit up-to N steps clock-wise, then counter-clock-wise\r\n");
+              String("  get-tag    - reads the RFID tag\r\n") +
+              String("  move-cw:N  - moves N slots clock-wise\r\n") +
+              String("  move-ccw:N - moves N slots counter-clock-wise\r\n") +
+              String("  cdpins     - show the status of the connector-detect pins\r\n") +
+              String("  step:N     - moves N steps clock-wise (steps < 0 => counter-clock-wise)\r\n") +
+              String("  l          - toggles slit detector Infra Red led\r\n") +
+              String("  d          - detects the slit\r\n") +
+              String("  search:N   - searches for the slit up-to N steps clock-wise, then counter-clock-wise\r\n");
     }
     else if (command.startsWith("d", 0)) {
       reply = slitDetected() ? String("SLIT") : String("NO-SLIT");
